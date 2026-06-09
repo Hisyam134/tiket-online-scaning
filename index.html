@@ -118,7 +118,6 @@
                     document.getElementById('res-code').innerText = decodedText;
                     document.getElementById('res-name').innerText = "Tiket Palsu";
                     
-                    // PERBAIKAN: JANGAN tulis kolom 'id'. Biarkan auto-increment database yang mengisinya agar tidak error!
                     await _supabase.from('transactions').insert({ 
                         ticket_code: decodedText, 
                         customer_name: 'Tiket Palsu', 
@@ -133,7 +132,6 @@
 
                 // 2. KONDISI TIKET PAID (VALID & BELUM TERPAKAI)
                 if (trx.status === 'PAID') {
-                    // PERBAIKAN: Update murni dicari berdasarkan ticket_code
                     await _supabase.from('transactions').update({ status: 'USED' }).eq('ticket_code', decodedText);
                     playBeep('success');
                     resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 text-emerald-200";
@@ -149,12 +147,14 @@
                     document.getElementById('status-subtitle').innerText = "Pernah digunakan sebelumnya.";
                 }
 
+                // Ambil data terbaru setelah diupdate agar UI menampilkan status real sesuai perubahan terbaru
                 document.getElementById('res-code').innerText = trx.ticket_code;
                 document.getElementById('res-name').innerText = trx.customer_name || 'Guest';
                 bottomSheet.classList.remove('translate-y-full');
                 
                 autoResetTimeout = setTimeout(resetScanner, 2000);
             } catch (err) {
+                console.error("Scanner Error:", err);
                 resetScanner();
             }
         }
