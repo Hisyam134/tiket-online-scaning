@@ -11,11 +11,11 @@
 
     <header class="max-w-6xl w-full mx-auto flex justify-between items-center mb-6 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
         <div>
-            <h1 class="text-xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">TIKETIN MONITORING</h1>
-            <p class="text-xs text-slate-400">Sinkronisasi Otomatis Real-time Tanpa Refresh</p>
+            <h1 class="text-xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">TIKETIN LIVE MONITORING</h1>
+            <p class="text-xs text-slate-400">Sinkronisasi Otomatis Aliran Gate Tanpa Refresh</p>
         </div>
         <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-emerald-400 font-mono">
-            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE SINKRON
+            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE AKTIF
         </div>
     </header>
 
@@ -46,14 +46,14 @@
                 <table class="w-full text-left text-sm">
                     <thead>
                         <tr class="bg-slate-950 text-slate-400 text-xs font-bold border-b border-slate-800 uppercase">
-                            <th class="p-4">Waktu</th>
-                            <th class="p-4">Nama</th>
+                            <th class="p-4">Nama Pengunjung</th>
                             <th class="p-4">Kode Tiket</th>
-                            <th class="p-4 text-center">Status</th>
+                            <th class="p-4">ID Pesanan</th>
+                            <th class="p-4 text-center">Status Akses</th>
                         </tr>
                     </thead>
                     <tbody id="table-body" class="divide-y divide-slate-800/40 font-medium">
-                        <tr><td colspan="4" class="p-8 text-center text-slate-500">Menghubungkan ke server...</td></tr>
+                        <tr><td colspan="4" class="p-8 text-center text-slate-500">Menghubungkan jaringan data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -65,51 +65,50 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let masterData = [], currentTab = 'all';
+        let localDataStore = [], currentTab = 'all';
 
-        async function loadData() {
-            const { data } = await _supabase.from('transactions').select('*').order('updated_at', { ascending: false }).limit(50);
-            masterData = data || [];
-            updateUI();
+        async function initFetch() {
+            // Mengambil semua data yang sudah berstatus USED (Berhasil) atau status lainnya yang di-scan
+            const { data } = await _supabase.from('transactions').select('*');
+            localDataStore = data || [];
+            updateDashboardUI();
         }
 
-        function updateUI() {
-            // Hitung Counter Statistik
-            // Anggap Sukses jika statusnya 'USED' setelah diproses oleh scanner
-            const total = masterData.filter(item => item.status === 'USED' || item.status === 'DUPLICATE' || item.status === 'FAILED').length;
-            const success = masterData.filter(item => item.status === 'USED').length;
-            const failed = total - success;
+        function updateDashboardUI() {
+            // Menyaring data yang aktif di-scan (di luar tiket PAID yang belum datang ke gate)
+            const scannedItems = localDataStore.filter(item => item.status === 'USED' || item.status === 'FAILED' || item.status === 'DUPLICATE');
+            const successItems = localDataStore.filter(item => item.status === 'USED');
+            const failedItems = scannedItems.length - successItems.length;
 
-            document.getElementById('stat-total').innerText = total;
-            document.getElementById('stat-success').innerText = success;
-            document.getElementById('stat-failed').innerText = failed;
+            document.getElementById('stat-total').innerText = scannedItems.length;
+            document.getElementById('stat-success').innerText = successItems.length;
+            document.getElementById('stat-failed').innerText = failedItems;
 
-            // Filter data sesuai halaman (Tab aktif)
-            let filtered = masterData;
-            if (currentTab === 'success') filtered = masterData.filter(item => item.status === 'USED');
-            if (currentTab === 'failed') filtered = masterData.filter(item => item.status === 'DUPLICATE' || item.status === 'FAILED');
+            let renderingData = scannedItems;
+            if (currentTab === 'success') renderingData = successItems;
+            if (currentTab === 'failed') renderingData = localDataStore.filter(item => item.status === 'FAILED' || item.status === 'DUPLICATE');
 
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
-            if(filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-600">Belum ada aktivitas data log</td></tr>`;
+            if(renderingData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-600">Tidak ada log data pada halaman ini</td></tr>`;
                 return;
             }
 
-            filtered.forEach(item => {
-                const date = item.updated_at ? new Date(item.updated_at) : new Date();
-                const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-                const isSuccess = item.status === 'USED';
-                
+            // Urutkan data berdasarkan ID/Perubahan paling baru agar langsung muncul paling atas
+            renderingData.sort((a,b) => b.id - a.id);
+
+            renderingData.forEach(item => {
+                const checkSuccess = item.status === 'USED';
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-950/40">
-                        <td class="p-4 text-xs font-mono text-slate-500">${timeStr}</td>
-                        <td class="p-4 text-slate-200">${item.customer_name || 'Guest'}</td>
+                        <td class="p-4 text-slate-200">${item.customer_name || 'Tanpa Nama'}</td>
                         <td class="p-4 font-mono text-xs text-indigo-400">${item.ticket_code}</td>
+                        <td class="p-4 font-mono text-xs text-slate-400">${item.order_id || '-'}</td>
                         <td class="p-4 text-center">
-                            <span class="px-2 py-1 rounded text-[10px] font-bold ${isSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
-                                ${isSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT'}
+                            <span class="px-3 py-1 rounded text-[10px] font-bold ${checkSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
+                                ${checkSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT'}
                             </span>
                         </td>
                     </tr>`;
@@ -119,21 +118,21 @@
         function switchTab(tab) {
             currentTab = tab;
             ['all', 'success', 'failed'].forEach(t => {
-                const btn = document.getElementById(`tab-${t}`);
-                btn.className = t === tab ? "flex-1 py-2 rounded-lg text-xs font-bold uppercase bg-indigo-600 text-white" : "flex-1 py-2 rounded-lg text-xs font-medium uppercase text-slate-400";
+                document.getElementById(`tab-${t}`).className = t === tab ? "flex-1 py-2 rounded-lg text-xs font-bold uppercase bg-indigo-600 text-white" : "flex-1 py-2 rounded-lg text-xs font-medium uppercase text-slate-400";
             });
-            updateUI();
+            updateDashboardUI();
         }
 
-        // AKSI REAL-TIME: Otomatis tangkap perubahan data saat HP melakukan scan
-        _supabase.channel('live-changes')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, payload => {
-                masterData = masterData.filter(i => i.id !== payload.new.id);
-                masterData.unshift(payload.new);
-                updateUI();
+        // PENDENGAR UTAMA (REAL-TIME LISTENER): Otomatis refresh data komponen saat HP melakukan scan
+        _supabase.channel('custom-filter-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
+                // Hapus entri lama jika ada update, lalu masukkan objek data terbaru dari scanner
+                localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
+                localDataStore.push(payload.new);
+                updateDashboardUI();
             }).subscribe();
 
-        window.onload = loadData;
+            window.onload = initFetch;
     </script>
 </body>
 </html>
