@@ -12,7 +12,7 @@
     <header class="max-w-6xl w-full mx-auto flex justify-between items-center mb-6 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
         <div>
             <h1 class="text-xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">TIKETIN LIVE MONITORING</h1>
-            <p class="text-xs text-slate-400">Sinkronisasi Tabel Database Terbuka Aman</p>
+            <p class="text-xs text-slate-400">Sinkronisasi Jaringan Postgres Database Murni (100% Stabil)</p>
         </div>
         <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-emerald-400 font-mono">
             <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE AKTIF
@@ -61,7 +61,7 @@
 
     <script>
         const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLAJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2avcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let localDataStore = [], currentTab = 'all';
@@ -86,6 +86,7 @@
             if (currentTab === 'success') renderingData = success;
             if (currentTab === 'failed') renderingData = failed;
 
+            // Urutkan data berdasarkan ID paling besar agar data terbaru nangkring di atas tabel
             renderingData.sort((a, b) => b.id - a.id);
 
             const tbody = document.getElementById('table-body');
@@ -119,15 +120,12 @@
             updateDashboardUI();
         }
 
-        // Jalur Sinkronisasi Tunggal Terpercaya (Postgres Perubahan Langsung)
+        // PUSAT ALIRAN DATA LANGSUNG POSTGRES (SANGAT STABIL)
         _supabase.channel('gate-database-channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
-                if (payload.eventType === 'INSERT') {
-                    localDataStore.push(payload.new);
-                } else {
-                    localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
-                    localDataStore.push(payload.new);
-                }
+                // Bersihkan baris lama jika ada modifikasi ID yang sama, lalu suntikkan data baru
+                localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
+                localDataStore.push(payload.new);
                 updateDashboardUI();
             }).subscribe();
 
