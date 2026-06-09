@@ -59,7 +59,7 @@
 
     <script>
         const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLAJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2avcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let html5Qrcode, isProcessing = false, lastScannedCode = null, autoResetTimeout = null;
@@ -109,7 +109,7 @@
             try {
                 const { data: trx, error } = await _supabase.from('transactions').select('*').eq('ticket_code', decodedText).single();
 
-                // JIKA TIKET TIDAK VALID / PALSU
+                // 1. KONDISI TIKET PALSU (TIDAK ADA DI DATABASE)
                 if (error || !trx) {
                     playBeep('error');
                     resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 text-rose-200";
@@ -118,14 +118,12 @@
                     document.getElementById('res-code').innerText = decodedText;
                     document.getElementById('res-name').innerText = "Tiket Palsu";
                     
-                    // KUNCI PERUBAHAN: Generate ID besar acak agar tidak bentrok dengan auto-increment DB Anda
-                    const fakeId = Math.floor(100000 + Math.random() * 900000);
+                    // PERBAIKAN: JANGAN tulis kolom 'id'. Biarkan auto-increment database yang mengisinya agar tidak error!
                     await _supabase.from('transactions').insert({ 
-                        id: fakeId,
                         ticket_code: decodedText, 
                         customer_name: 'Tiket Palsu', 
                         status: 'FAILED',
-                        order_id: 'FAKE-' + fakeId
+                        order_id: 'LAPOR-PALSU-' + Date.now()
                     });
                     
                     bottomSheet.classList.remove('translate-y-full');
@@ -133,14 +131,18 @@
                     return;
                 }
 
+                // 2. KONDISI TIKET PAID (VALID & BELUM TERPAKAI)
                 if (trx.status === 'PAID') {
-                    await _supabase.from('transactions').update({ status: 'USED' }).eq('id', trx.id);
+                    // PERBAIKAN: Update murni dicari berdasarkan ticket_code
+                    await _supabase.from('transactions').update({ status: 'USED' }).eq('ticket_code', decodedText);
                     playBeep('success');
                     resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 text-emerald-200";
                     document.getElementById('status-title').innerText = "Akses Diizinkan";
                     document.getElementById('status-subtitle').innerText = "Silakan masuk gate.";
+                
+                // 3. KONDISI TIKET DUPLIKAT (SUDAH PERNAH SCAN SEBELUMNYA)
                 } else {
-                    await _supabase.from('transactions').update({ status: 'DUPLICATE' }).eq('id', trx.id);
+                    await _supabase.from('transactions').update({ status: 'DUPLICATE' }).eq('ticket_code', decodedText);
                     playBeep('warning');
                     resultBox.className = "p-6 rounded-2xl text-left bg-amber-950/95 border-2 border-amber-500 text-amber-200";
                     document.getElementById('status-title').innerText = "Tiket Duplikat";
