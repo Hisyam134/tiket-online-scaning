@@ -3,20 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TiketIn Pro - Clean Enterprise Scanner</title>
+    <title>TiketIn Pro - Scanner Gate</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        #reader video { 
-            object-fit: cover !important; 
-            width: 100% !important; 
-            height: 100% !important;
-        }
-        /* Menyembunyikan shading/elemen kotak bawaan html5-qrcode jika masih ter-render */
-        #reader__scan_region {
-            background: transparent !important;
-        }
+        #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
+        #reader__scan_region { background: transparent !important; }
         button { cursor: pointer; }
     </style>
 </head>
@@ -28,12 +21,162 @@
             <p class="text-xs text-slate-400">Gate 1 - Main Stadium</p>
         </div>
         <div class="text-right">
-            <span class="text-xs text-slate-500 font-medium block uppercase tracking-widest">Checked In</span>
+            <span class="text-xs text-slate-500 font-medium block uppercase tracking-widest">Status Gate</span>
             <span class="text-lg font-bold text-emerald-400 font-mono" id="scan-count">ACTIVE</span>
         </div>
     </header>
 
     <main class="w-full max-w-md flex-1 flex flex-col my-4 mx-auto min-h-0 bg-slate-900/40 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl">
+        <p class="text-slate-400 text-xs font-medium tracking-wide mb-4 text-center shrink-0">Arahkan kamera bebas ke QR Code</p>
+        <div class="w-full flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner relative">
+            <div id="reader" class="w-full h-full"></div>
+            <div id="laser-line" class="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_12px_#6366f1] animate-pulse top-1/2 pointer-events-none"></div>
+        </div>
+    </main>
+
+    <footer class="mb-2 text-center shrink-0">
+        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Management System v2.6</p>
+    </footer>
+
+    <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 transform translate-y-full transition-transform duration-500 z-50 p-4 max-w-md mx-auto">
+        <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-xl -z-10 rounded-t-3xl"></div>
+        <div id="result-box" class="p-6 rounded-2xl shadow-2xl text-left border bg-slate-900/95 transition-all duration-300">
+            <div class="w-16 h-1 bg-slate-700 rounded-full mx-auto mb-6 opacity-40"></div> 
+            <div class="text-center mb-6">
+                <h3 id="status-title" class="text-2xl font-black tracking-wide uppercase"></h3>
+                <p id="status-subtitle" class="text-xs mt-1 text-slate-400 font-medium"></p>
+            </div>
+            <div class="space-y-3 border-y border-slate-800/80 py-5 font-medium">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Nama Pembeli</span>
+                    <span id="res-name" class="text-slate-100 font-semibold truncate max-w-[200px]"></span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Kode Tiket</span>
+                    <span id="res-code" class="font-mono text-indigo-300 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded text-xs"></span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">ID Pesanan</span>
+                    <span id="res-order" class="font-mono text-slate-300 text-xs"></span>
+                </div>
+            </div>
+            <button onclick="resetScanner()" class="mt-6 w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 px-4 rounded-xl text-sm uppercase">
+                Siap Pindai Berikutnya
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let html5Qrcode, isProcessing = false, lastScannedCode = null, autoResetTimeout = null;
+
+        function playBeep(type) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                if (type === 'success') {
+                    osc.type = 'square'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime); 
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+                } else {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function onScanSuccess(decodedText) {
+            if (isProcessing) return; 
+            isProcessing = true; 
+            if(autoResetTimeout) clearTimeout(autoResetTimeout);
+
+            const bottomSheet = document.getElementById('bottom-sheet');
+            const resultBox = document.getElementById('result-box');
+            const statusTitle = document.getElementById('status-title');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            
+            if (decodedText === lastScannedCode) {
+                playBeep('warning');
+                resultBox.className = "p-6 rounded-2xl text-left bg-orange-950/95 border-2 border-orange-500 text-orange-200";
+                statusTitle.innerText = "Sistem Anti Spam";
+                statusSubtitle.innerText = "QR Baru saja di-scan. Geser kamera.";
+                document.getElementById('res-code').innerText = decodedText;
+                document.getElementById('res-name').innerText = "Sistem Terkunci";
+                document.getElementById('res-order').innerText = "SPAM DETECTED";
+                bottomSheet.classList.remove('translate-y-full');
+                autoResetTimeout = setTimeout(resetScanner, 2000);
+                return;
+            }
+
+            lastScannedCode = decodedText;
+            document.getElementById('scan-count').innerText = "PROSES...";
+
+            try {
+                const { data: trx, error } = await _supabase.from('transactions').select('*').eq('ticket_code', decodedText).single();
+
+                if (error || !trx) {
+                    playBeep('error');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 text-rose-200";
+                    statusTitle.innerText = "Tiket Tidak Valid";
+                    statusSubtitle.innerText = "Kode QR salah atau palsu.";
+                    document.getElementById('res-code').innerText = decodedText;
+                    document.getElementById('res-name').innerText = "Unknown Guest";
+                    document.getElementById('res-order').innerText = "-";
+                    bottomSheet.classList.remove('translate-y-full');
+                    autoResetTimeout = setTimeout(resetScanner, 2500);
+                    return;
+                }
+
+                if (trx.status === 'PAID') {
+                    await _supabase.from('transactions').update({ status: 'USED', updated_at: new Date().toISOString() }).eq('id', trx.id);
+                    playBeep('success');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 text-emerald-200";
+                    statusTitle.innerText = "Akses Diizinkan";
+                    statusSubtitle.innerText = "Silakan masuk gate.";
+                } else {
+                    playBeep('warning');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-amber-950/95 border-2 border-amber-500 text-amber-200";
+                    statusTitle.innerText = "Tiket Duplikat";
+                    statusSubtitle.innerText = "Pernah digunakan sebelumnya.";
+                }
+
+                document.getElementById('res-code').innerText = trx.ticket_code;
+                document.getElementById('res-name').innerText = trx.customer_name;
+                document.getElementById('res-order').innerText = trx.order_id;
+                bottomSheet.classList.remove('translate-y-full');
+                
+                // OTOMATIS SCANNER TERBUKA LAGI DALAM 2.5 DETIK TANPA KLIK TOMBOL
+                autoResetTimeout = setTimeout(resetScanner, 2500);
+            } catch (err) {
+                resetScanner();
+            }
+        }
+
+        function startScanner() {
+            if (!html5Qrcode) { html5Qrcode = new Html5Qrcode("reader"); }
+            setTimeout(() => {
+                html5Qrcode.start({ facingMode: "environment" }, { fps: 24 }, onScanSuccess, () => {}).catch(err => {});
+            }, 300);
+        }
+
+        function resetScanner() {
+            if(autoResetTimeout) clearTimeout(autoResetTimeout);
+            document.getElementById('bottom-sheet').classList.add('translate-y-full'); 
+            document.getElementById('scan-count').innerText = "ACTIVE";
+            setTimeout(() => { lastScannedCode = null; isProcessing = false; }, 400);
+        }
+
+        window.onload = startScanner;
+    </script>
+</body>
+</html>
         <p class="text-slate-400 text-xs font-medium tracking-wide mb-4 text-center shrink-0">Arahkan kamera bebas ke QR Code</p>
 
         <div class="w-full flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner relative">
