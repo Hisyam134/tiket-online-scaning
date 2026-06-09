@@ -67,12 +67,18 @@
         let localDataStore = [], currentTab = 'all';
 
         async function initFetch() {
-            const { data } = await _supabase.from('transactions').select('*');
-            localDataStore = data || [];
-            updateDashboardUI();
+            try {
+                const { data, error } = await _supabase.from('transactions').select('*');
+                if (error) throw error;
+                localDataStore = data || [];
+                updateDashboardUI();
+            } catch (err) {
+                console.error("Gagal mengambil data awal:", err);
+            }
         }
 
         function updateDashboardUI() {
+            // Saring data berdasarkan statusnya masing-masing
             const success = localDataStore.filter(item => item.status === 'USED');
             const failed = localDataStore.filter(item => item.status === 'DUPLICATE' || item.status === 'FAILED');
             const total = success.length + failed.length;
@@ -82,11 +88,13 @@
             document.getElementById('stat-failed').innerText = failed.length;
 
             let renderingData = [];
-            if (currentTab === 'all') renderingData = localDataStore.filter(i => i.status === 'USED' || i.status === 'DUPLICATE' || i.status === 'FAILED');
+            if (currentTab === 'all') {
+                renderingData = localDataStore.filter(i => i.status === 'USED' || i.status === 'DUPLICATE' || i.status === 'FAILED');
+            }
             if (currentTab === 'success') renderingData = success;
             if (currentTab === 'failed') renderingData = failed;
 
-            // Urutkan data berdasarkan ID paling besar agar data terbaru nangkring di atas tabel
+            // Urutkan data berdasarkan ID paling besar agar data terbaru nangkring paling atas
             renderingData.sort((a, b) => b.id - a.id);
 
             const tbody = document.getElementById('table-body');
@@ -99,13 +107,17 @@
 
             renderingData.forEach(item => {
                 const checkSuccess = item.status === 'USED';
+                let statusLabel = 'GAGAL / PALSU';
+                if (item.status === 'USED') statusLabel = 'BERHASIL';
+                if (item.status === 'DUPLICATE') statusLabel = 'DUPLICATE';
+
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-950/40">
                         <td class="p-4 text-slate-200">${item.customer_name || 'Tanpa Nama'}</td>
                         <td class="p-4 font-mono text-sm text-indigo-400">${item.ticket_code}</td>
                         <td class="p-4 text-center">
                             <span class="px-3 py-1 rounded text-xs font-bold ${checkSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
-                                ${checkSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT / PALSU'}
+                                ${statusLabel}
                             </span>
                         </td>
                     </tr>`;
@@ -120,14 +132,28 @@
             updateDashboardUI();
         }
 
-        // PUSAT ALIRAN DATA LANGSUNG POSTGRES (SANGAT STABIL)
+        // PUSAT ALIRAN DATA LANGSUNG POSTGRES REALTIME (SANGAT STABIL & AMAN DARI CRASH)
         _supabase.channel('gate-database-channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
-                // Bersihkan baris lama jika ada modifikasi ID yang sama, lalu suntikkan data baru
-                localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
-                localDataStore.push(payload.new);
+                console.log("Log Realtime Masuk:", payload); // Pantau event database di F12 Console
+
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    if (payload.new && payload.new.id) {
+                        // Bersihkan data lama jika ID-nya sama, lalu timpa dengan data baru
+                        localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
+                        localDataStore.push(payload.new);
+                    }
+                } else if (payload.eventType === 'DELETE') {
+                    if (payload.old && payload.old.id) {
+                        localDataStore = localDataStore.filter(i => i.id !== payload.old.id);
+                    }
+                }
+                
                 updateDashboardUI();
-            }).subscribe();
+            })
+            .subscribe((status) => {
+                console.log("Koneksi Saluran Realtime:", status); // Memastikan status handshake 'SUBSCRIBED'
+            });
 
         window.onload = initFetch;
     </script>
