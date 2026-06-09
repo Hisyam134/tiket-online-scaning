@@ -8,14 +8,8 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        #reader video { 
-            object-fit: cover !important; 
-            width: 100% !important; 
-            height: 100% !important;
-        }
-        #reader__scan_region {
-            background: transparent !important;
-        }
+        #reader video { object-fit: cover !important; width: 100% !important; height: 100% !important; }
+        #reader__scan_region { background: transparent !important; }
         button { cursor: pointer; }
     </style>
 </head>
@@ -33,16 +27,11 @@
     </header>
 
     <main class="w-full max-w-md flex-1 flex flex-col my-4 mx-auto min-h-0 bg-slate-900/40 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl">
-        <p class="text-slate-400 text-xs font-medium tracking-wide mb-4 text-center shrink-0">Arahkan kamera bebas ke QR Code</p>
         <div class="w-full flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner relative">
             <div id="reader" class="w-full h-full"></div>
             <div id="laser-line" class="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_12px_#6366f1] animate-pulse top-1/2 pointer-events-none"></div>
         </div>
     </main>
-
-    <footer class="mb-2 text-center shrink-0">
-        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Scanner System v3.2</p>
-    </footer>
 
     <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 transform translate-y-full transition-transform duration-500 z-50 p-4 max-w-md mx-auto">
         <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-xl -z-10 rounded-t-3xl"></div>
@@ -75,11 +64,6 @@
 
         let html5Qrcode, isProcessing = false, lastScannedCode = null, autoResetTimeout = null;
 
-        // MEMBUAT SALURAN PENYIARAN UDARA (REALTIME BROADCAST CHANNEL)
-        const broadcastChannel = _supabase.channel('gate-broadcast-room');
-        broadcastChannel.subscribe();
-
-        // BEEP AUDIO FEEDBACK
         function playBeep(type) {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -99,7 +83,6 @@
             } catch (e) {}
         }
 
-        // LOGIKA UTAMA PEMINDAIAN
         async function onScanSuccess(decodedText) {
             if (isProcessing) return; 
             isProcessing = true; 
@@ -108,12 +91,11 @@
             const bottomSheet = document.getElementById('bottom-sheet');
             const resultBox = document.getElementById('result-box');
             
-            // ANTI SPAM DOUBLE TAP CAMERA
             if (decodedText === lastScannedCode) {
                 playBeep('warning');
                 resultBox.className = "p-6 rounded-2xl text-left bg-orange-950/95 border-2 border-orange-500 text-orange-200";
                 document.getElementById('status-title').innerText = "Sistem Anti Spam";
-                document.getElementById('status-subtitle').innerText = "QR Baru saja di-scan. Geser kamera.";
+                document.getElementById('status-subtitle').innerText = "QR Baru saja di-scan.";
                 document.getElementById('res-code').innerText = decodedText;
                 document.getElementById('res-name').innerText = "Sistem Terkunci";
                 bottomSheet.classList.remove('translate-y-full');
@@ -127,7 +109,7 @@
             try {
                 const { data: trx, error } = await _supabase.from('transactions').select('*').eq('ticket_code', decodedText).single();
 
-                // KONDISI 1: JIKA KODE QR TIDAK TERDAFTAR (TIKET PALSU)
+                // JIKA TIKET TIDAK VALID / PALSU
                 if (error || !trx) {
                     playBeep('error');
                     resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 text-rose-200";
@@ -136,11 +118,14 @@
                     document.getElementById('res-code').innerText = decodedText;
                     document.getElementById('res-name').innerText = "Tiket Palsu";
                     
-                    // SOLUSI UTAMA: Siarkan langsung lewat udara ke dashboard tanpa menyentuh tabel DB
-                    broadcastChannel.send({
-                        type: 'broadcast',
-                        event: 'ticket-scanned',
-                        payload: { id: Date.now(), ticket_code: decodedText, customer_name: 'Tiket Palsu', status: 'FAILED' }
+                    // KUNCI PERUBAHAN: Generate ID besar acak agar tidak bentrok dengan auto-increment DB Anda
+                    const fakeId = Math.floor(100000 + Math.random() * 900000);
+                    await _supabase.from('transactions').insert({ 
+                        id: fakeId,
+                        ticket_code: decodedText, 
+                        customer_name: 'Tiket Palsu', 
+                        status: 'FAILED',
+                        order_id: 'FAKE-' + fakeId
                     });
                     
                     bottomSheet.classList.remove('translate-y-full');
@@ -148,15 +133,12 @@
                     return;
                 }
 
-                // KONDISI 2: JIKA TIKET VALID & BELUM DIPAKAI (PAID)
                 if (trx.status === 'PAID') {
                     await _supabase.from('transactions').update({ status: 'USED' }).eq('id', trx.id);
                     playBeep('success');
                     resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 text-emerald-200";
                     document.getElementById('status-title').innerText = "Akses Diizinkan";
                     document.getElementById('status-subtitle').innerText = "Silakan masuk gate.";
-                
-                // KONDISI 3: JIKA TIKET DUPLIKAT (PERNAH DI SCAN SEBELUMNYA)
                 } else {
                     await _supabase.from('transactions').update({ status: 'DUPLICATE' }).eq('id', trx.id);
                     playBeep('warning');
