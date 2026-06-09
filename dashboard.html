@@ -2,38 +2,274 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TiketIn Pro - Real-time Master Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TiketIn Pro - Clean Enterprise Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        #reader video { 
+            object-fit: cover !important; 
+            width: 100% !important; 
+            height: 100% !important;
+        }
+        #reader__scan_region {
+            background: transparent !important;
+        }
+        button { cursor: pointer; }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-100 h-screen max-h-screen flex flex-col p-4 font-sans overflow-hidden select-none">
 
-    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
+    <header class="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl flex justify-between items-center z-10 mx-auto shrink-0">
         <div>
-            <h1 class="text-xl font-black tracking-wider bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
-                TIKETIN <span class="text-xs font-normal text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-950">DASHBOARD</span>
-            </h1>
-            <p class="text-xs text-slate-400 mt-0.5">Monitoring Live Aliran Gate Masuk Stadium</p>
+            <h1 class="text-lg font-black tracking-wider bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">TIKETIN <span class="text-xs font-normal text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-950 ml-1">PRO</span></h1>
+            <p class="text-xs text-slate-400">Gate 1 - Main Stadium</p>
         </div>
-        <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            <span class="relative flex h-2 w-2">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span class="text-xs font-mono text-emerald-400 font-medium uppercase tracking-wider">Koneksi Live Aktif</span>
+        <div class="text-right">
+            <span class="text-xs text-slate-500 font-medium block uppercase tracking-widest">Status Gate</span>
+            <span class="text-lg font-bold text-emerald-400 font-mono" id="scan-count">ACTIVE</span>
         </div>
     </header>
 
-    <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+    <main class="w-full max-w-md flex-1 flex flex-col my-4 mx-auto min-h-0 bg-slate-900/40 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl">
+        <p class="text-slate-400 text-xs font-medium tracking-wide mb-4 text-center shrink-0">Arahkan kamera bebas ke QR Code</p>
+
+        <div class="w-full flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner relative">
+            <div id="reader" class="w-full h-full"></div>
+            <div id="laser-line" class="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_12px_#6366f1] animate-pulse top-1/2 pointer-events-none"></div>
+        </div>
+    </main>
+
+    <footer class="mb-2 text-center shrink-0">
+        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Management System v2.6</p>
+    </footer>
+
+    <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 transform translate-y-full transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) z-50 p-4 max-w-md mx-auto">
+        <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-xl -z-10 rounded-t-3xl"></div>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-400 font-medium">Total Scan Masuk</p>
-                    <h3 class="text-3xl font-black font-mono mt-1 text-indigo-400" id="stat-total">0</h3>
+        <div id="result-box" class="p-6 rounded-2xl shadow-2xl text-left border bg-slate-900/95 transition-all duration-300">
+            <div class="w-16 h-1 bg-slate-700 rounded-full mx-auto mb-6 opacity-40"></div> 
+            
+            <div class="text-center mb-6">
+                <h3 id="status-title" class="text-2xl font-black tracking-wide uppercase"></h3>
+                <p id="status-subtitle" class="text-xs mt-1 text-slate-400 font-medium"></p>
+            </div>
+            
+            <div class="space-y-3 border-y border-slate-800/80 py-5 font-medium">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Nama Pembeli</span>
+                    <span id="res-name" class="text-slate-100 font-semibold truncate max-w-[200px]"></span>
                 </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Kode Tiket</span>
+                    <span id="res-code" class="font-mono text-indigo-300 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded text-xs"></span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">ID Pesanan</span>
+                    <span id="res-order" class="font-mono text-slate-300 text-xs"></span>
+                </div>
+            </div>
+            
+            <button onclick="resetScanner()" class="mt-6 w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/30 tracking-wider text-sm uppercase">
+                Siap Pindai Berikutnya
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let html5Qrcode;
+        let isProcessing = false; 
+        let lastScannedCode = null; 
+        let autoResetTimeout = null;
+
+        // AUDIO ENGINE
+        function playBeep(type) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (type === 'success') {
+                    let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.type = 'square'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime); 
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+                } else if (type === 'warning' || type === 'error') {
+                    const duration = 0.08;
+                    setTimeout(() => {
+                        let osc1 = audioCtx.createOscillator(); let gain1 = audioCtx.createGain();
+                        osc1.connect(gain1); gain1.connect(audioCtx.destination);
+                        osc1.type = 'sawtooth'; osc1.frequency.setValueAtTime(220, audioCtx.currentTime);
+                        gain1.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                        osc1.start(); osc1.stop(audioCtx.currentTime + duration);
+                    }, 0);
+                    setTimeout(() => {
+                        let osc2 = audioCtx.createOscillator(); let gain2 = audioCtx.createGain();
+                        osc2.connect(gain2); gain2.connect(audioCtx.destination);
+                        osc2.type = 'sawtooth'; osc2.frequency.setValueAtTime(220, audioCtx.currentTime);
+                        gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                        osc2.start(); osc2.stop(audioCtx.currentTime + duration);
+                    }, 120);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // FUNGSI REAL-TIME SCAN
+        async function onScanSuccess(decodedText, decodedResult) {
+            if (isProcessing) return; 
+            isProcessing = true; 
+
+            // Clear interval auto-reset sebelumnya jika ada scan baru masuk cepat
+            if(autoResetTimeout) clearTimeout(autoResetTimeout);
+
+            const bottomSheet = document.getElementById('bottom-sheet');
+            const resultBox = document.getElementById('result-box');
+            const statusTitle = document.getElementById('status-title');
+            const statusSubtitle = document.getElementById('status-subtitle');
+            const resCode = document.getElementById('res-code');
+            const resName = document.getElementById('res-name');
+            const resOrder = document.getElementById('res-order');
+
+            // ANTI-SPAM: Jika mendeteksi QR Code yang sama berturut-turut
+            if (decodedText === lastScannedCode) {
+                playBeep('warning');
+                resultBox.className = "p-6 rounded-2xl text-left bg-orange-950/95 border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)] text-orange-200";
+                statusTitle.innerText = "Sistem Anti Spam";
+                statusSubtitle.innerText = "QR Code ini baru saja Anda scan. Geser kamera menjauh.";
+                resCode.innerText = decodedText;
+                resName.innerText = "Sistem Terkunci";
+                resOrder.innerText = "SPAM DETECTED";
+                document.getElementById('scan-count').innerText = "ANTI-SPAM";
+                bottomSheet.classList.remove('translate-y-full');
+                
+                // Berikan jeda 2.5 detik lalu buka kembali scanner secara otomatis
+                autoResetTimeout = setTimeout(resetScanner, 2500);
+                return;
+            }
+
+            lastScannedCode = decodedText;
+            document.getElementById('laser-line').classList.remove('animate-pulse');
+            document.getElementById('laser-line').classList.add('opacity-0');
+            document.getElementById('scan-count').innerText = "PROSES...";
+
+            try {
+                // Ambil data tiket secara real-time langsung ke tabel transactions
+                const { data: trx, error } = await _supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('ticket_code', decodedText)
+                    .single();
+
+                if (error || !trx) {
+                    playBeep('error');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-rose-200";
+                    statusTitle.innerText = "Tiket Tidak Valid";
+                    statusSubtitle.innerText = "Kode QR salah atau palsu.";
+                    resCode.innerText = decodedText;
+                    resName.innerText = "Unknown Guest";
+                    resOrder.innerText = "-";
+                    document.getElementById('scan-count').innerText = "REJECTED";
+                    bottomSheet.classList.remove('translate-y-full');
+                    
+                    autoResetTimeout = setTimeout(resetScanner, 3000);
+                    return;
+                }
+
+                if (trx.status === 'PAID') {
+                    // Update langsung status ke USED di database
+                    const { error: updateError } = await _supabase
+                        .from('transactions')
+                        .update({ status: 'USED', updated_at: new Date().toISOString() })
+                        .eq('id', trx.id);
+
+                    if(updateError) throw updateError;
+
+                    playBeep('success');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] text-emerald-200";
+                    statusTitle.innerText = "Akses Diizinkan";
+                    statusSubtitle.innerText = "Silakan arahkan penonton masuk gate.";
+                    resCode.innerText = trx.ticket_code;
+                    resName.innerText = trx.customer_name;
+                    resOrder.innerText = trx.order_id;
+                    document.getElementById('scan-count').innerText = "SUCCESS";
+
+                } else if (trx.status === 'USED') {
+                    playBeep('warning');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-amber-950/95 border-2 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)] text-amber-200";
+                    statusTitle.innerText = "Tiket Duplikat";
+                    statusSubtitle.innerText = "Pernah digunakan sebelumnya.";
+                    resCode.innerText = trx.ticket_code;
+                    resName.innerText = trx.customer_name;
+                    resOrder.innerText = trx.order_id;
+                    document.getElementById('scan-count').innerText = "DUPLICATE";
+                    
+                } else {
+                    playBeep('error');
+                    resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-rose-200";
+                    statusTitle.innerText = "Akses Ditolak";
+                    statusSubtitle.innerText = `Status pembayaran: ${trx.status}`;
+                    resCode.innerText = trx.ticket_code;
+                    resName.innerText = trx.customer_name;
+                    resOrder.innerText = trx.order_id;
+                    document.getElementById('scan-count').innerText = "FAILED";
+                }
+
+                // Munculkan Bottom Sheet Hasil
+                bottomSheet.classList.remove('translate-y-full');
+                
+                // OTOMATISASI REAL-TIME: Menutup popup & membuka kembali scanner dalam 3 detik tanpa klik tombol!
+                autoResetTimeout = setTimeout(resetScanner, 3000);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('scan-count').innerText = "ERROR";
+                resetScanner();
+            }
+        }
+
+        // Start Camera
+        function startScanner() {
+            document.getElementById('scan-count').innerText = "ACTIVE";
+            if (!html5Qrcode) { html5Qrcode = new Html5Qrcode("reader"); }
+
+            setTimeout(() => {
+                html5Qrcode.start(
+                    { facingMode: "environment" }, 
+                    { fps: 24 },
+                    onScanSuccess,
+                    (errorMessage) => {}
+                ).catch(err => { console.error(err); });
+            }, 300);
+        }
+
+        // Reset Scanner (Otomatis & Manual)
+        function resetScanner() {
+            if(autoResetTimeout) clearTimeout(autoResetTimeout);
+            
+            const bottomSheet = document.getElementById('bottom-sheet');
+            bottomSheet.classList.add('translate-y-full'); 
+            
+            document.getElementById('laser-line').classList.remove('opacity-0');
+            document.getElementById('laser-line').classList.add('animate-pulse');
+            document.getElementById('scan-count').innerText = "ACTIVE";
+
+            // Mengosongkan cache kode terakhir agar kamera siap menembak kode baru/sama setelah reset
+            setTimeout(() => {
+                lastScannedCode = null; 
+                isProcessing = false; 
+            }, 500);
+        }
+
+        window.onload = startScanner;
+    </script>
+</body>
+</html>
                 <div class="p-3 bg-indigo-500/10 rounded-xl text-indigo-400"><i data-lucide="layers"></i></div>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
