@@ -12,7 +12,7 @@
     <header class="max-w-6xl w-full mx-auto flex justify-between items-center mb-6 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
         <div>
             <h1 class="text-xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">TIKETIN LIVE MONITORING</h1>
-            <p class="text-xs text-slate-400">Sinkronisasi Otomatis Aliran Gate Tanpa Refresh</p>
+            <p class="text-xs text-slate-400">Sinkronisasi Otomatis Aliran Gate (Termasuk Deteksi Tiket Palsu)</p>
         </div>
         <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-emerald-400 font-mono">
             <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE AKTIF
@@ -20,18 +20,19 @@
     </header>
 
     <main class="max-w-6xl w-full mx-auto flex-1 flex flex-col gap-6">
+        
         <div class="grid grid-cols-3 gap-4">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
                 <p class="text-xs text-slate-400 font-medium">Total Scan</p>
-                <h3 class="text-2xl font-black text-indigo-400 font-mono mt-1" id="stat-total">0</h3>
+                <h3 class="text-3xl font-black text-indigo-400 font-mono mt-1" id="stat-total">0</h3>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
                 <p class="text-xs text-slate-400 font-medium">Berhasil</p>
-                <h3 class="text-2xl font-black text-emerald-400 font-mono mt-1" id="stat-success">0</h3>
+                <h3 class="text-3xl font-black text-emerald-400 font-mono mt-1" id="stat-success">0</h3>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
-                <p class="text-xs text-slate-400 font-medium">Gagal / Duplikat</p>
-                <h3 class="text-2xl font-black text-rose-400 font-mono mt-1" id="stat-failed">0</h3>
+                <p class="text-xs text-slate-400 font-medium">Gagal / Duplikat / Palsu</p>
+                <h3 class="text-3xl font-black text-rose-400 font-mono mt-1" id="stat-failed">0</h3>
             </div>
         </div>
 
@@ -48,12 +49,11 @@
                         <tr class="bg-slate-950 text-slate-400 text-xs font-bold border-b border-slate-800 uppercase">
                             <th class="p-4">Nama Pengunjung</th>
                             <th class="p-4">Kode Tiket</th>
-                            <th class="p-4">ID Pesanan</th>
                             <th class="p-4 text-center">Status Akses</th>
                         </tr>
                     </thead>
                     <tbody id="table-body" class="divide-y divide-slate-800/40 font-medium">
-                        <tr><td colspan="4" class="p-8 text-center text-slate-500">Menghubungkan jaringan data...</td></tr>
+                        <tr><td colspan="3" class="p-8 text-center text-slate-500">Menghubungkan jaringan data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -62,53 +62,58 @@
 
     <script>
         const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLAJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let localDataStore = [], currentTab = 'all';
 
+        // 1. AMBIL DATA AWAL SAAT DASHBOARD DIBUKA
         async function initFetch() {
-            // Mengambil semua data yang sudah berstatus USED (Berhasil) atau status lainnya yang di-scan
             const { data } = await _supabase.from('transactions').select('*');
             localDataStore = data || [];
             updateDashboardUI();
         }
 
+        // 2. HITUNG DAN RENDER DATA KE LAYAR DASHBOARD
         function updateDashboardUI() {
-            // Menyaring data yang aktif di-scan (di luar tiket PAID yang belum datang ke gate)
-            const scannedItems = localDataStore.filter(item => item.status === 'USED' || item.status === 'FAILED' || item.status === 'DUPLICATE');
-            const successItems = localDataStore.filter(item => item.status === 'USED');
-            const failedItems = scannedItems.length - successItems.length;
+            // Filter data yang valid masuk hitungan log scan
+            const success = localDataStore.filter(item => item.status === 'USED');
+            const failed = localDataStore.filter(item => item.status === 'DUPLICATE' || item.status === 'FAILED');
+            const total = success.length + failed.length;
 
-            document.getElementById('stat-total').innerText = scannedItems.length;
-            document.getElementById('stat-success').innerText = successItems.length;
-            document.getElementById('stat-failed').innerText = failedItems;
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-success').innerText = success.length;
+            document.getElementById('stat-failed').innerText = failed.length;
 
-            let renderingData = scannedItems;
-            if (currentTab === 'success') renderingData = successItems;
-            if (currentTab === 'failed') renderingData = localDataStore.filter(item => item.status === 'FAILED' || item.status === 'DUPLICATE');
+            let renderingData = [];
+            if (currentTab === 'all') {
+                renderingData = localDataStore.filter(i => i.status === 'USED' || i.status === 'DUPLICATE' || i.status === 'FAILED');
+            } else if (currentTab === 'success') {
+                renderingData = success;
+            } else if (currentTab === 'failed') {
+                renderingData = failed;
+            }
+
+            // Urutkan berdasarkan ID / Waktu paling baru agar selalu muncul paling atas
+            renderingData.sort((a, b) => b.id - a.id);
 
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
-            if(renderingData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-600">Tidak ada log data pada halaman ini</td></tr>`;
+            if (renderingData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-8 text-center text-slate-600">Tidak ada log aktivitas pada halaman ini</td></tr>`;
                 return;
             }
-
-            // Urutkan data berdasarkan ID/Perubahan paling baru agar langsung muncul paling atas
-            renderingData.sort((a,b) => b.id - a.id);
 
             renderingData.forEach(item => {
                 const checkSuccess = item.status === 'USED';
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-950/40">
                         <td class="p-4 text-slate-200">${item.customer_name || 'Tanpa Nama'}</td>
-                        <td class="p-4 font-mono text-xs text-indigo-400">${item.ticket_code}</td>
-                        <td class="p-4 font-mono text-xs text-slate-400">${item.order_id || '-'}</td>
+                        <td class="p-4 font-mono text-sm text-indigo-400">${item.ticket_code}</td>
                         <td class="p-4 text-center">
-                            <span class="px-3 py-1 rounded text-[10px] font-bold ${checkSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
-                                ${checkSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT'}
+                            <span class="px-3 py-1 rounded text-xs font-bold ${checkSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
+                                ${checkSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT / PALSU'}
                             </span>
                         </td>
                     </tr>`;
@@ -123,16 +128,28 @@
             updateDashboardUI();
         }
 
-        // PENDENGAR UTAMA (REAL-TIME LISTENER): Otomatis refresh data komponen saat HP melakukan scan
-        _supabase.channel('custom-filter-channel')
+        // ==========================================
+        // KUNCI REAL-TIME LISTENER (DUA JALUR SINKRONISASI)
+        // ==========================================
+
+        // JALUR A: Mendengar update tiket asli dari database (PAID -> USED / DUPLICATE)
+        _supabase.channel('gate-database-channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
-                // Hapus entri lama jika ada update, lalu masukkan objek data terbaru dari scanner
                 localDataStore = localDataStore.filter(i => i.id !== payload.new.id);
                 localDataStore.push(payload.new);
                 updateDashboardUI();
             }).subscribe();
 
-            window.onload = initFetch;
+        // JALUR B: Mendengar siaran langsung "tiket palsu" dari HP Scanner tanpa lewat tabel DB
+        _supabase.channel('gate-broadcast-room')
+            .on('broadcast', { event: 'ticket-scanned' }, payload => {
+                // Hapus jika ada duplikasi ID instan, lalu masukkan payload siaran tiket palsu
+                localDataStore = localDataStore.filter(i => i.id !== payload.payload.id);
+                localDataStore.push(payload.payload);
+                updateDashboardUI();
+            }).subscribe();
+
+        window.onload = initFetch;
     </script>
 </body>
 </html>
