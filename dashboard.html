@@ -2,474 +2,138 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TiketIn Pro - Clean Enterprise Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TiketIn Pro - Live Master Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        #reader video { 
-            object-fit: cover !important; 
-            width: 100% !important; 
-            height: 100% !important;
-        }
-        #reader__scan_region {
-            background: transparent !important;
-        }
-        button { cursor: pointer; }
-    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen max-h-screen flex flex-col p-4 font-sans overflow-hidden select-none">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col p-6">
 
-    <header class="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl flex justify-between items-center z-10 mx-auto shrink-0">
+    <header class="max-w-6xl w-full mx-auto flex justify-between items-center mb-6 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
         <div>
-            <h1 class="text-lg font-black tracking-wider bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">TIKETIN <span class="text-xs font-normal text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-950 ml-1">PRO</span></h1>
-            <p class="text-xs text-slate-400">Gate 1 - Main Stadium</p>
+            <h1 class="text-xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">TIKETIN MONITORING</h1>
+            <p class="text-xs text-slate-400">Sinkronisasi Otomatis Real-time Tanpa Refresh</p>
         </div>
-        <div class="text-right">
-            <span class="text-xs text-slate-500 font-medium block uppercase tracking-widest">Status Gate</span>
-            <span class="text-lg font-bold text-emerald-400 font-mono" id="scan-count">ACTIVE</span>
+        <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-emerald-400 font-mono">
+            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE SINKRON
         </div>
     </header>
 
-    <main class="w-full max-w-md flex-1 flex flex-col my-4 mx-auto min-h-0 bg-slate-900/40 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl">
-        <p class="text-slate-400 text-xs font-medium tracking-wide mb-4 text-center shrink-0">Arahkan kamera bebas ke QR Code</p>
-
-        <div class="w-full flex-1 min-h-0 overflow-hidden rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner relative">
-            <div id="reader" class="w-full h-full"></div>
-            <div id="laser-line" class="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_12px_#6366f1] animate-pulse top-1/2 pointer-events-none"></div>
-        </div>
-    </main>
-
-    <footer class="mb-2 text-center shrink-0">
-        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Management System v2.6</p>
-    </footer>
-
-    <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 transform translate-y-full transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) z-50 p-4 max-w-md mx-auto">
-        <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-xl -z-10 rounded-t-3xl"></div>
-        
-        <div id="result-box" class="p-6 rounded-2xl shadow-2xl text-left border bg-slate-900/95 transition-all duration-300">
-            <div class="w-16 h-1 bg-slate-700 rounded-full mx-auto mb-6 opacity-40"></div> 
-            
-            <div class="text-center mb-6">
-                <h3 id="status-title" class="text-2xl font-black tracking-wide uppercase"></h3>
-                <p id="status-subtitle" class="text-xs mt-1 text-slate-400 font-medium"></p>
+    <main class="max-w-6xl w-full mx-auto flex-1 flex flex-col gap-6">
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                <p class="text-xs text-slate-400 font-medium">Total Scan</p>
+                <h3 class="text-2xl font-black text-indigo-400 font-mono mt-1" id="stat-total">0</h3>
             </div>
-            
-            <div class="space-y-3 border-y border-slate-800/80 py-5 font-medium">
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-slate-400">Nama Pembeli</span>
-                    <span id="res-name" class="text-slate-100 font-semibold truncate max-w-[200px]"></span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-slate-400">Kode Tiket</span>
-                    <span id="res-code" class="font-mono text-indigo-300 bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded text-xs"></span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                    <span class="text-slate-400">ID Pesanan</span>
-                    <span id="res-order" class="font-mono text-slate-300 text-xs"></span>
-                </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                <p class="text-xs text-slate-400 font-medium">Berhasil</p>
+                <h3 class="text-2xl font-black text-emerald-400 font-mono mt-1" id="stat-success">0</h3>
             </div>
-            
-            <button onclick="resetScanner()" class="mt-6 w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 px-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/30 tracking-wider text-sm uppercase">
-                Siap Pindai Berikutnya
-            </button>
-        </div>
-    </div>
-
-    <script>
-        const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let html5Qrcode;
-        let isProcessing = false; 
-        let lastScannedCode = null; 
-        let autoResetTimeout = null;
-
-        // AUDIO ENGINE
-        function playBeep(type) {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (type === 'success') {
-                    let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
-                    osc.connect(gain); gain.connect(audioCtx.destination);
-                    osc.type = 'square'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime); 
-                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
-                    osc.start(); osc.stop(audioCtx.currentTime + 0.12);
-                } else if (type === 'warning' || type === 'error') {
-                    const duration = 0.08;
-                    setTimeout(() => {
-                        let osc1 = audioCtx.createOscillator(); let gain1 = audioCtx.createGain();
-                        osc1.connect(gain1); gain1.connect(audioCtx.destination);
-                        osc1.type = 'sawtooth'; osc1.frequency.setValueAtTime(220, audioCtx.currentTime);
-                        gain1.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-                        osc1.start(); osc1.stop(audioCtx.currentTime + duration);
-                    }, 0);
-                    setTimeout(() => {
-                        let osc2 = audioCtx.createOscillator(); let gain2 = audioCtx.createGain();
-                        osc2.connect(gain2); gain2.connect(audioCtx.destination);
-                        osc2.type = 'sawtooth'; osc2.frequency.setValueAtTime(220, audioCtx.currentTime);
-                        gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-                        osc2.start(); osc2.stop(audioCtx.currentTime + duration);
-                    }, 120);
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        // FUNGSI REAL-TIME SCAN
-        async function onScanSuccess(decodedText, decodedResult) {
-            if (isProcessing) return; 
-            isProcessing = true; 
-
-            // Clear interval auto-reset sebelumnya jika ada scan baru masuk cepat
-            if(autoResetTimeout) clearTimeout(autoResetTimeout);
-
-            const bottomSheet = document.getElementById('bottom-sheet');
-            const resultBox = document.getElementById('result-box');
-            const statusTitle = document.getElementById('status-title');
-            const statusSubtitle = document.getElementById('status-subtitle');
-            const resCode = document.getElementById('res-code');
-            const resName = document.getElementById('res-name');
-            const resOrder = document.getElementById('res-order');
-
-            // ANTI-SPAM: Jika mendeteksi QR Code yang sama berturut-turut
-            if (decodedText === lastScannedCode) {
-                playBeep('warning');
-                resultBox.className = "p-6 rounded-2xl text-left bg-orange-950/95 border-2 border-orange-500 shadow-[0_0_30px_rgba(249,115,22,0.3)] text-orange-200";
-                statusTitle.innerText = "Sistem Anti Spam";
-                statusSubtitle.innerText = "QR Code ini baru saja Anda scan. Geser kamera menjauh.";
-                resCode.innerText = decodedText;
-                resName.innerText = "Sistem Terkunci";
-                resOrder.innerText = "SPAM DETECTED";
-                document.getElementById('scan-count').innerText = "ANTI-SPAM";
-                bottomSheet.classList.remove('translate-y-full');
-                
-                // Berikan jeda 2.5 detik lalu buka kembali scanner secara otomatis
-                autoResetTimeout = setTimeout(resetScanner, 2500);
-                return;
-            }
-
-            lastScannedCode = decodedText;
-            document.getElementById('laser-line').classList.remove('animate-pulse');
-            document.getElementById('laser-line').classList.add('opacity-0');
-            document.getElementById('scan-count').innerText = "PROSES...";
-
-            try {
-                // Ambil data tiket secara real-time langsung ke tabel transactions
-                const { data: trx, error } = await _supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('ticket_code', decodedText)
-                    .single();
-
-                if (error || !trx) {
-                    playBeep('error');
-                    resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-rose-200";
-                    statusTitle.innerText = "Tiket Tidak Valid";
-                    statusSubtitle.innerText = "Kode QR salah atau palsu.";
-                    resCode.innerText = decodedText;
-                    resName.innerText = "Unknown Guest";
-                    resOrder.innerText = "-";
-                    document.getElementById('scan-count').innerText = "REJECTED";
-                    bottomSheet.classList.remove('translate-y-full');
-                    
-                    autoResetTimeout = setTimeout(resetScanner, 3000);
-                    return;
-                }
-
-                if (trx.status === 'PAID') {
-                    // Update langsung status ke USED di database
-                    const { error: updateError } = await _supabase
-                        .from('transactions')
-                        .update({ status: 'USED', updated_at: new Date().toISOString() })
-                        .eq('id', trx.id);
-
-                    if(updateError) throw updateError;
-
-                    playBeep('success');
-                    resultBox.className = "p-6 rounded-2xl text-left bg-emerald-950/95 border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] text-emerald-200";
-                    statusTitle.innerText = "Akses Diizinkan";
-                    statusSubtitle.innerText = "Silakan arahkan penonton masuk gate.";
-                    resCode.innerText = trx.ticket_code;
-                    resName.innerText = trx.customer_name;
-                    resOrder.innerText = trx.order_id;
-                    document.getElementById('scan-count').innerText = "SUCCESS";
-
-                } else if (trx.status === 'USED') {
-                    playBeep('warning');
-                    resultBox.className = "p-6 rounded-2xl text-left bg-amber-950/95 border-2 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)] text-amber-200";
-                    statusTitle.innerText = "Tiket Duplikat";
-                    statusSubtitle.innerText = "Pernah digunakan sebelumnya.";
-                    resCode.innerText = trx.ticket_code;
-                    resName.innerText = trx.customer_name;
-                    resOrder.innerText = trx.order_id;
-                    document.getElementById('scan-count').innerText = "DUPLICATE";
-                    
-                } else {
-                    playBeep('error');
-                    resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.3)] text-rose-200";
-                    statusTitle.innerText = "Akses Ditolak";
-                    statusSubtitle.innerText = `Status pembayaran: ${trx.status}`;
-                    resCode.innerText = trx.ticket_code;
-                    resName.innerText = trx.customer_name;
-                    resOrder.innerText = trx.order_id;
-                    document.getElementById('scan-count').innerText = "FAILED";
-                }
-
-                // Munculkan Bottom Sheet Hasil
-                bottomSheet.classList.remove('translate-y-full');
-                
-                // OTOMATISASI REAL-TIME: Menutup popup & membuka kembali scanner dalam 3 detik tanpa klik tombol!
-                autoResetTimeout = setTimeout(resetScanner, 3000);
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('scan-count').innerText = "ERROR";
-                resetScanner();
-            }
-        }
-
-        // Start Camera
-        function startScanner() {
-            document.getElementById('scan-count').innerText = "ACTIVE";
-            if (!html5Qrcode) { html5Qrcode = new Html5Qrcode("reader"); }
-
-            setTimeout(() => {
-                html5Qrcode.start(
-                    { facingMode: "environment" }, 
-                    { fps: 24 },
-                    onScanSuccess,
-                    (errorMessage) => {}
-                ).catch(err => { console.error(err); });
-            }, 300);
-        }
-
-        // Reset Scanner (Otomatis & Manual)
-        function resetScanner() {
-            if(autoResetTimeout) clearTimeout(autoResetTimeout);
-            
-            const bottomSheet = document.getElementById('bottom-sheet');
-            bottomSheet.classList.add('translate-y-full'); 
-            
-            document.getElementById('laser-line').classList.remove('opacity-0');
-            document.getElementById('laser-line').classList.add('animate-pulse');
-            document.getElementById('scan-count').innerText = "ACTIVE";
-
-            // Mengosongkan cache kode terakhir agar kamera siap menembak kode baru/sama setelah reset
-            setTimeout(() => {
-                lastScannedCode = null; 
-                isProcessing = false; 
-            }, 500);
-        }
-
-        window.onload = startScanner;
-    </script>
-</body>
-</html>
-                <div class="p-3 bg-indigo-500/10 rounded-xl text-indigo-400"><i data-lucide="layers"></i></div>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-400 font-medium">Berhasil / Diizinkan</p>
-                    <h3 class="text-3xl font-black font-mono mt-1 text-emerald-400" id="stat-success">0</h3>
-                </div>
-                <div class="p-3 bg-emerald-500/10 rounded-xl text-emerald-400"><i data-lucide="check-circle-2"></i></div>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-400 font-medium">Gagal / Ditolak / Duplikat</p>
-                    <h3 class="text-3xl font-black font-mono mt-1 text-rose-400" id="stat-failed">0</h3>
-                </div>
-                <div class="p-3 bg-rose-500/10 rounded-xl text-rose-400"><i data-lucide="x-circle"></i></div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+                <p class="text-xs text-slate-400 font-medium">Gagal / Duplikat</p>
+                <h3 class="text-2xl font-black text-rose-400 font-mono mt-1" id="stat-failed">0</h3>
             </div>
         </div>
 
-        <div class="flex border-b border-slate-800 bg-slate-900/50 p-1.5 rounded-xl max-w-md">
-            <button onclick="switchTab('all')" id="tab-all" class="flex-1 py-2 px-4 rounded-lg text-sm font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md">
-                <i data-lucide="list" class="w-4 h-4"></i> Semua
-            </button>
-            <button onclick="switchTab('success')" id="tab-success" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium tracking-wide uppercase transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2">
-                <i data-lucide="check" class="w-4 h-4"></i> Berhasil
-            </button>
-            <button onclick="switchTab('failed')" id="tab-failed" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium tracking-wide uppercase transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i> Gagal
-            </button>
+        <div class="flex bg-slate-900 p-1 rounded-xl max-w-sm border border-slate-800">
+            <button onclick="switchTab('all')" id="tab-all" class="flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all bg-indigo-600 text-white">Semua</button>
+            <button onclick="switchTab('success')" id="tab-success" class="flex-1 py-2 rounded-lg text-xs font-medium uppercase text-slate-400">Berhasil</button>
+            <button onclick="switchTab('failed')" id="tab-failed" class="flex-1 py-2 rounded-lg text-xs font-medium uppercase text-slate-400">Gagal</button>
         </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex-1 shadow-2xl">
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full text-left text-sm">
                     <thead>
-                        <tr class="bg-slate-950 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-800">
-                            <th class="py-4 px-6">Waktu Scan</th>
-                            <th class="py-4 px-6">Nama Pengunjung</th>
-                            <th class="py-4 px-6">Kode Tiket</th>
-                            <th class="py-4 px-6">ID Pesanan</th>
-                            <th class="py-4 px-6 text-center">Status Akses</th>
+                        <tr class="bg-slate-950 text-slate-400 text-xs font-bold border-b border-slate-800 uppercase">
+                            <th class="p-4">Waktu</th>
+                            <th class="p-4">Nama</th>
+                            <th class="p-4">Kode Tiket</th>
+                            <th class="p-4 text-center">Status</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body" class="divide-y divide-slate-800/60 text-sm">
-                        <tr id="empty-row">
-                            <td colspan="5" class="py-12 text-center text-slate-500 font-medium">
-                                <div class="flex flex-col items-center justify-center gap-2">
-                                    <i data-lucide="database" class="w-8 h-8 animate-pulse text-slate-600"></i>
-                                    Memuat aliran data dari database...
-                                </div>
-                            </td>
-                        </tr>
+                    <tbody id="table-body" class="divide-y divide-slate-800/40 font-medium">
+                        <tr><td colspan="4" class="p-8 text-center text-slate-500">Menghubungkan ke server...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <footer class="p-6 text-center text-xs text-slate-600 border-t border-slate-900 mt-auto">
-        Dashboard Synced with Secure Gate Management System v2.6
-    </footer>
-
     <script>
-        // KREDENSIAL DATABASE (Sama persis dengan Scanner Anda)
         const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let masterDataList = []; // Menyimpan semua log lokal untuk difilter 3 halaman
-        let currentTab = 'all'; // Default halaman aktif
+        let masterData = [], currentTab = 'all';
 
-        // KATEGORISASI DATA
-        // Sukses = Status 'USED' (Sebab di scanner Anda, tiket PAID langsung diupdate ke USED)
-        // Gagal = Selain status USED (misal: FAILED, DUPLICATE, dll)
-        
-        async function loadInitialData() {
-            try {
-                // Tarik 100 riwayat scan terakhir dari database Supabase Anda
-                const { data, error } = await _supabase
-                    .from('transactions')
-                    .select('*')
-                    .order('updated_at', { ascending: false }) 
-                    .limit(100);
-
-                if (error) throw error;
-
-                masterDataList = data || [];
-                updateStats();
-                renderTable();
-            } catch (err) {
-                console.error("Gagal memuat data awal:", err);
-            }
+        async function loadData() {
+            const { data } = await _supabase.from('transactions').select('*').order('updated_at', { ascending: false }).limit(50);
+            masterData = data || [];
+            updateUI();
         }
 
-        function updateStats() {
-            // Hitung total data log berdasarkan status perubahan di scanner Anda
-            const total = masterDataList.length;
-            const success = masterDataList.filter(item => item.status === 'USED').length;
+        function updateUI() {
+            // Hitung Counter Statistik
+            // Anggap Sukses jika statusnya 'USED' setelah diproses oleh scanner
+            const total = masterData.filter(item => item.status === 'USED' || item.status === 'DUPLICATE' || item.status === 'FAILED').length;
+            const success = masterData.filter(item => item.status === 'USED').length;
             const failed = total - success;
 
             document.getElementById('stat-total').innerText = total;
             document.getElementById('stat-success').innerText = success;
             document.getElementById('stat-failed').innerText = failed;
-        }
 
-        function renderTable() {
+            // Filter data sesuai halaman (Tab aktif)
+            let filtered = masterData;
+            if (currentTab === 'success') filtered = masterData.filter(item => item.status === 'USED');
+            if (currentTab === 'failed') filtered = masterData.filter(item => item.status === 'DUPLICATE' || item.status === 'FAILED');
+
             const tbody = document.getElementById('table-body');
-            tbody.innerHTML = ''; // Kosongkan tabel
+            tbody.innerHTML = '';
 
-            // Memfilter data berdasarkan navigasi halaman (Tab aktif)
-            let filteredData = masterDataList;
-            if (currentTab === 'success') {
-                filteredData = masterDataList.filter(item => item.status === 'USED');
-            } else if (currentTab === 'failed') {
-                filteredData = masterDataList.filter(item => item.status !== 'USED');
-            }
-
-            if (filteredData.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="py-12 text-center text-slate-500 font-medium">
-                            Tidak ada data untuk kategori ini.
-                        </td>
-                    </tr>`;
+            if(filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-600">Belum ada aktivitas data log</td></tr>`;
                 return;
             }
 
-            filteredData.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-900/40 transition-colors";
-
-                // Format Waktu Indonesia Barat (WIB)
+            filtered.forEach(item => {
                 const date = item.updated_at ? new Date(item.updated_at) : new Date();
                 const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
-
-                // Tentukan Desain Badge Status Akses
-                let statusBadge = '';
-                if (item.status === 'USED') {
-                    statusBadge = `<span class="bg-emerald-950/60 border border-emerald-800 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">BERHASIL</span>`;
-                } else if (item.status === 'PAID') {
-                    // Status default sebelum di scan
-                    statusBadge = `<span class="bg-blue-950/60 border border-blue-800 text-blue-400 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">BELUM SCAN</span>`;
-                } else {
-                    // Menangkap status error/gagal dari scanner Anda
-                    statusBadge = `<span class="bg-rose-950/60 border border-rose-800 text-rose-400 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">GAGAL / DUPLIKAT</span>`;
-                }
-
-                tr.innerHTML = `
-                    <td class="py-4 px-6 font-mono text-slate-400 text-xs">${timeStr}</td>
-                    <td class="py-4 px-6 font-semibold text-slate-200">${item.customer_name || 'Tanpa Nama'}</td>
-                    <td class="py-4 px-6 font-mono text-indigo-300 text-xs bg-indigo-950/20 rounded border border-indigo-900/30 px-2 py-0.5 max-w-[150px] truncate">${item.ticket_code || '-'}</td>
-                    <td class="py-4 px-6 font-mono text-slate-400 text-xs">${item.order_id || '-'}</td>
-                    <td class="py-4 px-6 text-center">${statusBadge}</td>
-                `;
-                tbody.appendChild(tr);
+                const isSuccess = item.status === 'USED';
+                
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-950/40">
+                        <td class="p-4 text-xs font-mono text-slate-500">${timeStr}</td>
+                        <td class="p-4 text-slate-200">${item.customer_name || 'Guest'}</td>
+                        <td class="p-4 font-mono text-xs text-indigo-400">${item.ticket_code}</td>
+                        <td class="p-4 text-center">
+                            <span class="px-2 py-1 rounded text-[10px] font-bold ${isSuccess ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
+                                ${isSuccess ? 'BERHASIL' : 'GAGAL / DUPLIKAT'}
+                            </span>
+                        </td>
+                    </tr>`;
             });
         }
 
-        // FUNGSI GANTI HALAMAN (TAB SWITCHER)
-        function switchTab(tabName) {
-            currentTab = tabName;
-            
-            // Set Style tombol navigasi agar terlihat halaman mana yang aktif
-            const tabs = ['all', 'success', 'failed'];
-            tabs.forEach(t => {
+        function switchTab(tab) {
+            currentTab = tab;
+            ['all', 'success', 'failed'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
-                if (t === tabName) {
-                    btn.className = "flex-1 py-2 px-4 rounded-lg text-sm font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-2 bg-indigo-600 text-white shadow-md";
-                } else {
-                    btn.className = "flex-1 py-2 px-4 rounded-lg text-sm font-medium tracking-wide uppercase transition-all text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2";
-                }
+                btn.className = t === tab ? "flex-1 py-2 rounded-lg text-xs font-bold uppercase bg-indigo-600 text-white" : "flex-1 py-2 rounded-lg text-xs font-medium uppercase text-slate-400";
             });
-
-            renderTable();
+            updateUI();
         }
 
-        // SISTEM REAL-TIME: Mendengarkan perubahan data dari scanner secara langsung
-        function setupRealtimeSubscription() {
-            _supabase
-                .channel('live-dashboard-gate')
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, (payload) => {
-                    console.log('Update terdeteksi di scanner!', payload.new);
-                    
-                    // Hapus data lama yang usang di list lokal jika ada ID yang sama
-                    masterDataList = masterDataList.filter(item => item.id !== payload.new.id);
-                    
-                    // Masukkan data terbaru hasil scan ke posisi paling atas (paling baru)
-                    masterDataList.unshift(payload.new);
-                    
-                    // Render ulang komponen visual secara instant
-                    updateStats();
-                    renderTable();
-                })
-                .subscribe();
-        }
+        // AKSI REAL-TIME: Otomatis tangkap perubahan data saat HP melakukan scan
+        _supabase.channel('live-changes')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, payload => {
+                masterData = masterData.filter(i => i.id !== payload.new.id);
+                masterData.unshift(payload.new);
+                updateUI();
+            }).subscribe();
 
-        window.onload = async () => {
-            lucide.createIcons(); // Jalankan icon pack
-            await loadInitialData(); // Load data di database pertama kali dibuka
-            setupRealtimeSubscription(); // Hidupkan mode dengerin data live
-        };
+        window.onload = loadData;
     </script>
 </body>
 </html>
