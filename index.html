@@ -1,9 +1,9 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TiketIn Pro - Scanner Only Gate</title>
+    <title>TiketIn Pro - Scanner Gate</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -24,7 +24,7 @@
     <header class="w-full max-w-md bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-4 shadow-2xl flex justify-between items-center z-10 mx-auto shrink-0">
         <div>
             <h1 class="text-lg font-black tracking-wider bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">TIKETIN <span class="text-xs font-normal text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 bg-slate-950 ml-1">SCANNER</span></h1>
-            <p class="text-xs text-slate-400">Kamera Gate Masuk</p>
+            <p class="text-xs text-slate-400">Kamera HP - Gate Utama</p>
         </div>
         <div class="text-right">
             <span class="text-xs text-slate-500 font-medium block uppercase tracking-widest">Status Gate</span>
@@ -41,7 +41,7 @@
     </main>
 
     <footer class="mb-2 text-center shrink-0">
-        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Scanner System v3.0</p>
+        <p class="text-[10px] text-slate-600 tracking-widest uppercase font-semibold">Secure Gate Scanner System v3.2</p>
     </footer>
 
     <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 transform translate-y-full transition-transform duration-500 z-50 p-4 max-w-md mx-auto">
@@ -70,10 +70,14 @@
 
     <script>
         const SUPABASE_URL = "https://ctwpgzjsqkxkaornfgjd.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0d3BnempzcWt4a2Fvcm5mZ2pkIiwicm9sZSI6ImFub24iLAJpYXQiOjE3ODAwMzAzMzksImV4cCI6MjA5NTYwNjMzOX0.nSkB-m9UjDJ0RgXx_akQCxNJjwyLgj-QbH25S_zCVS8";
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let html5Qrcode, isProcessing = false, lastScannedCode = null, autoResetTimeout = null;
+
+        // MEMBUAT SALURAN PENYIARAN UDARA (REALTIME BROADCAST CHANNEL)
+        const broadcastChannel = _supabase.channel('gate-broadcast-room');
+        broadcastChannel.subscribe();
 
         // BEEP AUDIO FEEDBACK
         function playBeep(type) {
@@ -123,24 +127,28 @@
             try {
                 const { data: trx, error } = await _supabase.from('transactions').select('*').eq('ticket_code', decodedText).single();
 
-                // 1. JIKA KODE QR PALSU ATAU TIDAK ADA DI DB
+                // KONDISI 1: JIKA KODE QR TIDAK TERDAFTAR (TIKET PALSU)
                 if (error || !trx) {
                     playBeep('error');
                     resultBox.className = "p-6 rounded-2xl text-left bg-rose-950/95 border-2 border-rose-500 text-rose-200";
                     document.getElementById('status-title').innerText = "Tiket Tidak Valid";
                     document.getElementById('status-subtitle').innerText = "Kode salah atau palsu.";
                     document.getElementById('res-code').innerText = decodedText;
-                    document.getElementById('res-name').innerText = "Unknown / Tiket Palsu";
+                    document.getElementById('res-name').innerText = "Tiket Palsu";
                     
-                    // Trigger broadcast gagal ke dashboard lewat baris palsu database
-                    await _supabase.from('transactions').insert({ ticket_code: decodedText, customer_name: 'Tiket Palsu', status: 'FAILED' });
+                    // SOLUSI UTAMA: Siarkan langsung lewat udara ke dashboard tanpa menyentuh tabel DB
+                    broadcastChannel.send({
+                        type: 'broadcast',
+                        event: 'ticket-scanned',
+                        payload: { id: Date.now(), ticket_code: decodedText, customer_name: 'Tiket Palsu', status: 'FAILED' }
+                    });
                     
                     bottomSheet.classList.remove('translate-y-full');
                     autoResetTimeout = setTimeout(resetScanner, 2000);
                     return;
                 }
 
-                // 2. JIKA TIKET VALID & BELUM DIPAKAI (PAID)
+                // KONDISI 2: JIKA TIKET VALID & BELUM DIPAKAI (PAID)
                 if (trx.status === 'PAID') {
                     await _supabase.from('transactions').update({ status: 'USED' }).eq('id', trx.id);
                     playBeep('success');
@@ -148,7 +156,7 @@
                     document.getElementById('status-title').innerText = "Akses Diizinkan";
                     document.getElementById('status-subtitle').innerText = "Silakan masuk gate.";
                 
-                // 3. JIKA TIKET DUPLIKAT (PERNAH DI SCAN SEBELUMNYA)
+                // KONDISI 3: JIKA TIKET DUPLIKAT (PERNAH DI SCAN SEBELUMNYA)
                 } else {
                     await _supabase.from('transactions').update({ status: 'DUPLICATE' }).eq('id', trx.id);
                     playBeep('warning');
@@ -161,7 +169,6 @@
                 document.getElementById('res-name').innerText = trx.customer_name || 'Guest';
                 bottomSheet.classList.remove('translate-y-full');
                 
-                // POPUP MENUTUP OTOMATIS DALAM 2 DETIK
                 autoResetTimeout = setTimeout(resetScanner, 2000);
             } catch (err) {
                 resetScanner();
