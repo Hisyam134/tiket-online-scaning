@@ -113,7 +113,6 @@
                 document.getElementById('res-code').innerText = decodedText;
                 document.getElementById('res-name').innerText = "Sistem Terkunci";
                 bottomSheet.classList.remove('translate-y-full');
-                autoResetTimeout = setTimeout(resetScanner, 1800);
                 return;
             }
 
@@ -143,7 +142,6 @@
                     });
                     
                     bottomSheet.classList.remove('translate-y-full');
-                    autoResetTimeout = setTimeout(resetScanner, 2000);
                     return;
                 }
 
@@ -167,9 +165,6 @@
                 document.getElementById('res-code').innerText = trx.ticket_code;
                 document.getElementById('res-name').innerText = trx.customer_name || 'Guest';
                 bottomSheet.classList.remove('translate-y-full');
-                
-                // POPUP MENUTUP OTOMATIS DALAM 2 DETIK
-                autoResetTimeout = setTimeout(resetScanner, 2000);
             } catch (err) {
                 resetScanner();
             }
