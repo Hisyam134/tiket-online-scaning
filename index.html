@@ -132,8 +132,15 @@
                     document.getElementById('res-code').innerText = decodedText;
                     document.getElementById('res-name').innerText = "Unknown / Tiket Palsu";
                     
-                    // Trigger broadcast gagal ke dashboard lewat baris palsu database
-                    await _supabase.from('transactions').insert({ ticket_code: decodedText, customer_name: 'Tiket Palsu', status: 'FAILED' });
+                    // Trigger broadcast gagal ke dashboard lewat baris palsu database dengan menyertakan field wajib
+                    await _supabase.from('transactions').insert({ 
+                        order_id: 'UNREG-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+                        customer_email: 'unregistered@tiketin.pro',
+                        amount: 0,
+                        ticket_code: decodedText, 
+                        customer_name: 'Tiket Palsu', 
+                        status: 'FAILED' 
+                    });
                     
                     bottomSheet.classList.remove('translate-y-full');
                     autoResetTimeout = setTimeout(resetScanner, 2000);
@@ -186,4 +193,3 @@
     </script>
 </body>
 </html>
-
